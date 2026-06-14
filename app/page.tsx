@@ -483,7 +483,7 @@ export default function Home() {
     Object.values(currentPanels).forEach(arr => allUrls.push(...arr.map(g => g.originalUrl)));
     if (allUrls.length === 0) return;
 
-    const imgs: HTMLImageElement[] = await Promise.all(allUrls.map(url => new Promise((resolve) => {
+    const imgs: HTMLImageElement[] = await Promise.all(allUrls.map(url => new Promise<HTMLImageElement>((resolve) => {
         const img = new Image();
         img.onload = () => resolve(img);
         img.src = url;

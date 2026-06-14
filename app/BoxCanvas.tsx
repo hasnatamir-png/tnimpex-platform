@@ -57,7 +57,7 @@ function MagneticTrackball({target=[0,0,0]}:any){
   return<TrackballControls ref={ref} makeDefault panSpeed={2} zoomSpeed={3.5} rotateSpeed={3} staticMoving minDistance={1} maxDistance={300}/>;
 }
 function BoxLogo({panelData,panelWidth,panelHeight,isExtruded,t}:any){
-  const tex=useTexture(panelData.displayUrl);
+  const tex=useTexture(panelData.displayUrl) as THREE.Texture;
   const base=Math.min(panelWidth,panelHeight),z=isExtruded?t+0.001:0.026;
   return<Decal position={[panelData.x||0,panelData.y||0,z]} rotation={[0,0,0]} scale={[base*panelData.scale*0.5,base*panelData.scale*0.5,0.02]}><meshStandardMaterial map={tex} transparent polygonOffset polygonOffsetFactor={-1} depthTest/></Decal>;
 }
@@ -68,7 +68,7 @@ const Cardboard=({materialColor}:any)=>{
 };
 const PanelLabel=({label,length,width,isExtruded,t}:any)=>{
   const fs=Math.min(width*0.5,(length*0.8)/((label?.length||1)*0.65));
-  return<Text position={[0,0,isExtruded?t+0.001:0.027]} fontSize={fs} color="#283593" fillOpacity={0.25} anchorX="center" anchorY="middle" fontWeight="black" letterSpacing={0.1} depthTest>{label}</Text>;
+  return<Text position={[0,0,isExtruded?t+0.001:0.027]} fontSize={fs} color="#283593" fillOpacity={0.25} anchorX="center" anchorY="middle" fontWeight="black" letterSpacing={0.1}>{label}</Text>;
 };
 function WindowPanel({panelW,panelH,winW,winH,t,materialColor,panelData,label}:any){
   const shape=useMemo(()=>{const s=new THREE.Shape();s.moveTo(-panelW/2,-panelH/2);s.lineTo(panelW/2,-panelH/2);s.lineTo(panelW/2,panelH/2);s.lineTo(-panelW/2,panelH/2);s.lineTo(-panelW/2,-panelH/2);const h=new THREE.Path();h.moveTo(-winW/2,-winH/2);h.lineTo(winW/2,-winH/2);h.lineTo(winW/2,winH/2);h.lineTo(-winW/2,winH/2);h.lineTo(-winW/2,-winH/2);s.holes.push(h);return s;},[panelW,panelH,winW,winH]);
