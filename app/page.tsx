@@ -438,6 +438,8 @@ export default function Home() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
   const [specialNotes, setSpecialNotes] = useState("");
+  const [quoteSubmitting, setQuoteSubmitting] = useState(false);
+  const [quoteError, setQuoteError] = useState("");
 
   let currentFaceW = length;
   let currentFaceH = height; 
@@ -499,55 +501,72 @@ export default function Home() {
 
   const openQuoteModal = () => {
     setQuoteSubmitted(false);
+    setQuoteError("");
     setShowQuoteModal(true);
   };
 
   const closeQuoteModal = () => {
     setShowQuoteModal(false);
     setQuoteSubmitted(false);
+    setQuoteError("");
+    setQuoteSubmitting(false);
   };
 
-  const handleSubmitQuoteRequest = (event: FormEvent) => {
+  const handleSubmitQuoteRequest = async (event: FormEvent) => {
     event.preventDefault();
 
     if (!customerName.trim() || !customerEmail.trim()) return;
 
-    const boxSpecs = [
-      `Box Type: ${activeBox.name} (${activeBox.style})`,
-      `Dimensions: ${length}" L x ${width}" W x ${height}" D`,
-      `Material: ${material}${materialCategory === "Cardboard" ? `, ${thickness}` : ""}`,
-      `Ink Coverage: ${inkCoverage}`,
-      `Quantity: ${priceData.displayQty}`,
-      isWindowed && canHaveWindow ? `Window: ${safeWindowW}" x ${safeWindowH}" on ${windowFace}` : "Window: None",
-      "",
-      "Price Breakdown:",
-      `Material Cost: $${formatPrice(priceData.materialCost)}`,
-      `Print Cost: $${formatPrice(priceData.printCost)}`,
-      `Setup Fees: $${formatPrice(priceData.setupFees)}`,
-      `Shipping Estimate: $${formatPrice(priceData.shippingEstimate)}`,
-      priceData.profitAmount > 0 ? `Margin: $${formatPrice(priceData.profitAmount)}` : "",
-      `Total: $${formatPrice(priceData.total)}`,
-      "",
-      "Customer Details:",
-      `Name: ${customerName.trim()}`,
-      `Email: ${customerEmail.trim()}`,
-      `Phone: ${customerPhone.trim() || "Not provided"}`,
-      `Shipping Address: ${shippingAddress.trim() || "Not provided"}`,
-      `Notes: ${specialNotes.trim() || "None"}`,
-    ].filter(Boolean).join("\n");
+    setQuoteSubmitting(true);
+    setQuoteError("");
 
-    const mailtoLink = `mailto:hasnatamir@gmail.com?subject=${encodeURIComponent(`Quote Request - ${activeBox.name}`)}&body=${encodeURIComponent(boxSpecs)}`;
-    const cartNote = `Quote: ${activeBox.name} | ${length}x${width}x${height} | ${material} | Qty ${priceData.displayQty} | ${customerName.trim()}`;
-    const shopifyUrl = `https://tnimpex.com/cart?note=${encodeURIComponent(cartNote)}`;
+    const formData = new FormData();
+    formData.append("name", customerName.trim());
+    formData.append("email", customerEmail.trim());
+    formData.append("phone", customerPhone.trim() || "Not provided");
+    formData.append("shippingAddress", shippingAddress.trim() || "Not provided");
+    formData.append("specialNotes", specialNotes.trim() || "None");
+    formData.append("boxType", activeBox.name);
+    formData.append("boxStyle", activeBox.style);
+    formData.append("length", String(length));
+    formData.append("width", String(width));
+    formData.append("height", String(height));
+    formData.append("material", material);
+    formData.append("thickness", materialCategory === "Cardboard" ? thickness : "N/A");
+    formData.append("inkCoverage", inkCoverage);
+    formData.append("quantity", String(priceData.displayQty));
+    formData.append(
+      "window",
+      isWindowed && canHaveWindow
+        ? `${safeWindowW}" x ${safeWindowH}" on ${windowFace}`
+        : "None",
+    );
+    formData.append("materialCost", formatPrice(priceData.materialCost));
+    formData.append("printCost", formatPrice(priceData.printCost));
+    formData.append("setupFees", formatPrice(priceData.setupFees));
+    formData.append("shippingEstimate", formatPrice(priceData.shippingEstimate));
+    formData.append("profitAmount", formatPrice(priceData.profitAmount));
+    formData.append("total", formatPrice(priceData.total));
+    formData.append("_subject", `Quote Request - ${activeBox.name}`);
 
-    const mailAnchor = document.createElement("a");
-    mailAnchor.href = mailtoLink;
-    mailAnchor.click();
+    try {
+      const response = await fetch("https://formspree.io/f/xdavyaqp", {
+        method: "POST",
+        body: formData,
+        headers: { Accept: "application/json" },
+      });
 
-    setQuoteSubmitted(true);
-    window.setTimeout(() => {
-      window.location.href = shopifyUrl;
-    }, 2000);
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send quote request.");
+      }
+
+      setQuoteSubmitted(true);
+    } catch (error) {
+      setQuoteError(error instanceof Error ? error.message : "Failed to send quote request.");
+    } finally {
+      setQuoteSubmitting(false);
+    }
   };
   
   const syncGlobalColors = async (mode: ColorMode, currentPanels: Record<PanelKey, Graphic[]>) => {
@@ -863,11 +882,14 @@ export default function Home() {
                 </section>
 
                 <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                  {quoteError && (
+                    <p className="mr-auto text-sm font-bold text-red-600">{quoteError}</p>
+                  )}
                   <button type="button" onClick={closeQuoteModal} className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">
                     Cancel
                   </button>
-                  <button type="submit" className="px-5 py-2.5 bg-[#283593] rounded-lg text-sm font-bold text-white hover:bg-[#1A237E] transition-colors">
-                    Submit Quote Request
+                  <button type="submit" disabled={quoteSubmitting} className="px-5 py-2.5 bg-[#283593] rounded-lg text-sm font-bold text-white hover:bg-[#1A237E] transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                    {quoteSubmitting ? "Sending..." : "Submit Quote Request"}
                   </button>
                 </div>
               </form>
