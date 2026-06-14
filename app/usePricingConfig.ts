@@ -11,15 +11,15 @@ export function usePricingConfig(): PricingConfig {
   const [config, setConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
 
   useEffect(() => {
-    setConfig(loadPricingConfig());
+    loadPricingConfig().then(setConfig);
 
-    const syncConfig = () => setConfig(loadPricingConfig());
+    const syncConfig = () => {
+      loadPricingConfig().then(setConfig);
+    };
     window.addEventListener("pricing-config-updated", syncConfig);
-    window.addEventListener("storage", syncConfig);
 
     return () => {
       window.removeEventListener("pricing-config-updated", syncConfig);
-      window.removeEventListener("storage", syncConfig);
     };
   }, []);
 

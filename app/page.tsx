@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, type FormEvent } from "react";
+import { useState, useMemo, useEffect, type FormEvent } from "react";
 import BoxCanvas from "./BoxCanvas";
 import Dieline from "./Dieline";
-import { calculatePrice, loadPricingConfig } from "./pricing.config";
+import { calculatePrice, DEFAULT_PRICING_CONFIG, loadPricingConfig } from "./pricing.config";
 
 type PanelKey = "front" | "back" | "left" | "right" | "top" | "bottom";
 type ColorMode = "CMYK" | "2C" | "1C";
@@ -395,7 +395,11 @@ const materialOptions: any = {
 };
 
 export default function Home() {
-  const pricingConfig = loadPricingConfig();
+  const [pricingConfig, setPricingConfig] = useState(DEFAULT_PRICING_CONFIG);
+
+  useEffect(() => {
+    loadPricingConfig().then(setPricingConfig);
+  }, []);
   const [step, setStep] = useState(1);
   const [activeCategory, setActiveCategory] = useState("Cosmetic Boxes");
   const [activeBox, setActiveBox] = useState<any>(catalog["Cosmetic Boxes"][0]);
