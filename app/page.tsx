@@ -694,7 +694,7 @@ export default function Home() {
         <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-[#283593]/10 blur-[150px] rounded-full pointer-events-none"></div>
         <header className="w-full max-w-[1500px] h-16 flex items-center justify-between px-6 bg-white rounded-2xl border border-gray-200 shadow-sm relative z-10 mb-16">
           <div className="flex items-center gap-4">
-            <a href="https://tnimpex.com" className="text-xs font-bold text-[#283593] hover:underline transition-colors shrink-0">← Back to Store</a>
+            <button type="button" onClick={() => { window.top!.location.href = "https://tnimpex.com"; }} className="text-xs font-bold text-[#283593] hover:underline transition-colors shrink-0">← Back to Store</button>
             <div className="w-px h-5 bg-gray-300"></div>
             <div className="flex items-center gap-3"><TILogo size="w-10 h-10" text="text-xl" /><span className="font-black text-gray-900 text-lg tracking-tight">Tennessee IMPEX</span></div>
           </div>
@@ -750,7 +750,7 @@ export default function Home() {
     <div className="flex flex-col h-screen bg-[#f0f2f5] font-sans overflow-hidden">
       <header className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white z-20 shrink-0 shadow-sm">
         <div className="flex items-center gap-4">
-          <a href="https://tnimpex.com" className="text-xs font-bold text-[#283593] hover:underline transition-colors shrink-0">← Back to Store</a>
+          <button type="button" onClick={() => { window.top!.location.href = "https://tnimpex.com"; }} className="text-xs font-bold text-[#283593] hover:underline transition-colors shrink-0">← Back to Store</button>
           <div className="w-px h-5 bg-gray-300"></div>
           <button onClick={() => setStep(1)} className="text-gray-400 hover:text-gray-900 flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 transition-colors">←</button>
           <div className="w-px h-5 bg-gray-300 mx-2"></div><TILogo size="w-9 h-9" text="text-lg" /><span className="font-black text-gray-900 text-[15px] tracking-tight ml-1">Tennessee IMPEX</span><div className="w-px h-5 bg-gray-300 mx-2"></div><span className="font-bold text-gray-600 text-sm">{activeBox.name} Studio</span>
