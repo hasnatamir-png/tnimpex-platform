@@ -47,11 +47,11 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   windowCost: 0,
   shippingRates: {
     local: 0,
-    domestic: 150,
+    domestic: 0,
     international: 350,
   },
   profitMargin: 0,
-  surfaceAreaWasteFactor: 1.0,
+  surfaceAreaWasteFactor: 0.0,
   minQuantity: 500,
   defaultMaterialRate: 0.000,
   defaultShippingZone: "domestic",
