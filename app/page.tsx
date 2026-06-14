@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, type FormEvent } from "react";
 import BoxCanvas from "./BoxCanvas";
 import Dieline from "./Dieline";
+import { calculatePrice } from "./pricing.config";
+import { usePricingConfig } from "./usePricingConfig";
 
 type PanelKey = "front" | "back" | "left" | "right" | "top" | "bottom";
 type ColorMode = "CMYK" | "2C" | "1C";
@@ -393,10 +395,8 @@ const materialOptions: any = {
   "Corrugated": [{ id: "Corrugated E-Flute", name: "E-Flute (1/16\")" }, { id: "Corrugated B-Flute", name: "B-Flute (1/8\")" }, { id: "Corrugated C-Flute", name: "C-Flute (3/16\")" }]
 };
 
-const materialRates: any = { "SBS Premium White": 0.005, "Kraft Paperboard": 0.004, "Recycled Board": 0.0035, "Corrugated E-Flute": 0.012, "Corrugated B-Flute": 0.015, "Corrugated C-Flute": 0.018 };
-const thicknessMultiplier: any = { "14pt (250gsm)": 0.8, "16pt (300gsm)": 1.0, "18pt (350gsm)": 1.2, "24pt (400gsm)": 1.5 };
-
 export default function Home() {
+  const pricingConfig = usePricingConfig();
   const [step, setStep] = useState(1);
   const [activeCategory, setActiveCategory] = useState("Cosmetic Boxes");
   const [activeBox, setActiveBox] = useState<any>(catalog["Cosmetic Boxes"][0]);
@@ -431,6 +431,14 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [quoteSubmitted, setQuoteSubmitted] = useState(false);
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
+  const [specialNotes, setSpecialNotes] = useState("");
+
   let currentFaceW = length;
   let currentFaceH = height; 
 
@@ -450,25 +458,96 @@ export default function Home() {
   const safeWindowW = Math.max(1, Math.min(windowW, maxWindowW));
   const safeWindowH = Math.max(1, Math.min(windowH, maxWindowH));
 
-  const priceData = useMemo(() => {
-    const l = Number(length) || 0; const w = Number(width) || 0; const h = Number(height) || 0;
-    const calcQty = Math.max(500, Number(quantity) || 500);
-
-    const surfaceAreaSqIn = ((l * w * 2) + (l * h * 2) + (w * h * 2)) * 1.3;
-    let baseRate = materialRates[material] || 0.005;
-    if (materialCategory === "Cardboard" && thicknessMultiplier[thickness]) baseRate *= thicknessMultiplier[thickness];
-
-    const inkMultiplier = inkCoverage === "Printed (CMYK)" ? 1.4 : inkCoverage === "Premium (Foil/Spot UV)" ? 2.1 : 1.0;
-    const volumeDiscount = calcQty >= 10000 ? 0.6 : calcQty >= 5000 ? 0.75 : calcQty >= 1000 ? 0.85 : 1.0;
-    
-    const unitPrice = baseRate * inkMultiplier * volumeDiscount * surfaceAreaSqIn;
-    return { unit: unitPrice, total: (unitPrice * calcQty) + 150, displayQty: calcQty };
-  }, [length, width, height, material, materialCategory, thickness, quantity, inkCoverage]);
+  const priceData = useMemo(
+    () =>
+      calculatePrice(
+        {
+          length,
+          width,
+          height: height,
+          material,
+          materialCategory,
+          thickness,
+          quantity,
+          inkCoverage,
+          isWindowed,
+        },
+        pricingConfig,
+      ),
+    [
+      length,
+      width,
+      height,
+      material,
+      materialCategory,
+      thickness,
+      quantity,
+      inkCoverage,
+      isWindowed,
+      pricingConfig,
+    ],
+  );
 
   const handleBoxSelect = (box: any) => { 
     setActiveBox(box); setLength(box.l); setWidth(box.w); setHeight(box.d); 
     setWindowFace(['tray-lock','gable','two-piece'].includes(box.style) ? 'top' : 'front'); 
     setStep(2); 
+  };
+
+  const formatPrice = (amount: number) =>
+    amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const openQuoteModal = () => {
+    setQuoteSubmitted(false);
+    setShowQuoteModal(true);
+  };
+
+  const closeQuoteModal = () => {
+    setShowQuoteModal(false);
+    setQuoteSubmitted(false);
+  };
+
+  const handleSubmitQuoteRequest = (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!customerName.trim() || !customerEmail.trim()) return;
+
+    const boxSpecs = [
+      `Box Type: ${activeBox.name} (${activeBox.style})`,
+      `Dimensions: ${length}" L x ${width}" W x ${height}" D`,
+      `Material: ${material}${materialCategory === "Cardboard" ? `, ${thickness}` : ""}`,
+      `Ink Coverage: ${inkCoverage}`,
+      `Quantity: ${priceData.displayQty}`,
+      isWindowed && canHaveWindow ? `Window: ${safeWindowW}" x ${safeWindowH}" on ${windowFace}` : "Window: None",
+      "",
+      "Price Breakdown:",
+      `Material Cost: $${formatPrice(priceData.materialCost)}`,
+      `Print Cost: $${formatPrice(priceData.printCost)}`,
+      `Setup Fees: $${formatPrice(priceData.setupFees)}`,
+      `Shipping Estimate: $${formatPrice(priceData.shippingEstimate)}`,
+      priceData.profitAmount > 0 ? `Margin: $${formatPrice(priceData.profitAmount)}` : "",
+      `Total: $${formatPrice(priceData.total)}`,
+      "",
+      "Customer Details:",
+      `Name: ${customerName.trim()}`,
+      `Email: ${customerEmail.trim()}`,
+      `Phone: ${customerPhone.trim() || "Not provided"}`,
+      `Shipping Address: ${shippingAddress.trim() || "Not provided"}`,
+      `Notes: ${specialNotes.trim() || "None"}`,
+    ].filter(Boolean).join("\n");
+
+    const mailtoLink = `mailto:hasnatamir@gmail.com?subject=${encodeURIComponent(`Quote Request - ${activeBox.name}`)}&body=${encodeURIComponent(boxSpecs)}`;
+    const cartNote = `Quote: ${activeBox.name} | ${length}x${width}x${height} | ${material} | Qty ${priceData.displayQty} | ${customerName.trim()}`;
+    const shopifyUrl = `https://tnimpex.com/cart?note=${encodeURIComponent(cartNote)}`;
+
+    const mailAnchor = document.createElement("a");
+    mailAnchor.href = mailtoLink;
+    mailAnchor.click();
+
+    setQuoteSubmitted(true);
+    window.setTimeout(() => {
+      window.location.href = shopifyUrl;
+    }, 2000);
   };
   
   const syncGlobalColors = async (mode: ColorMode, currentPanels: Record<PanelKey, Graphic[]>) => {
@@ -614,7 +693,11 @@ export default function Home() {
       <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center py-12 px-8 font-sans pb-24 relative overflow-hidden">
         <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-[#283593]/10 blur-[150px] rounded-full pointer-events-none"></div>
         <header className="w-full max-w-[1500px] h-16 flex items-center justify-between px-6 bg-white rounded-2xl border border-gray-200 shadow-sm relative z-10 mb-16">
-          <div className="flex items-center gap-3"><TILogo size="w-10 h-10" text="text-xl" /><span className="font-black text-gray-900 text-lg tracking-tight">Tennessee IMPEX</span></div>
+          <div className="flex items-center gap-4">
+            <a href="https://tnimpex.com" className="text-xs font-bold text-[#283593] hover:underline transition-colors shrink-0">← Back to Store</a>
+            <div className="w-px h-5 bg-gray-300"></div>
+            <div className="flex items-center gap-3"><TILogo size="w-10 h-10" text="text-xl" /><span className="font-black text-gray-900 text-lg tracking-tight">Tennessee IMPEX</span></div>
+          </div>
           <div className="flex items-center gap-4 text-xs font-bold text-[#283593]"><span className="hover:underline cursor-pointer">Account</span><span>/</span><span className="hover:underline cursor-pointer">Sign In</span></div>
         </header>
 
@@ -667,6 +750,8 @@ export default function Home() {
     <div className="flex flex-col h-screen bg-[#f0f2f5] font-sans overflow-hidden">
       <header className="h-16 border-b border-gray-200 flex items-center justify-between px-6 bg-white z-20 shrink-0 shadow-sm">
         <div className="flex items-center gap-4">
+          <a href="https://tnimpex.com" className="text-xs font-bold text-[#283593] hover:underline transition-colors shrink-0">← Back to Store</a>
+          <div className="w-px h-5 bg-gray-300"></div>
           <button onClick={() => setStep(1)} className="text-gray-400 hover:text-gray-900 flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 transition-colors">←</button>
           <div className="w-px h-5 bg-gray-300 mx-2"></div><TILogo size="w-9 h-9" text="text-lg" /><span className="font-black text-gray-900 text-[15px] tracking-tight ml-1">Tennessee IMPEX</span><div className="w-px h-5 bg-gray-300 mx-2"></div><span className="font-bold text-gray-600 text-sm">{activeBox.name} Studio</span>
         </div>
@@ -677,9 +762,119 @@ export default function Home() {
              <span className="text-sm font-bold text-[#283593]">${priceData.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
            </div>
            <button className="px-5 py-2 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">Download Dieline</button>
-           <button className="px-5 py-2 bg-[#283593] rounded-lg text-sm font-bold text-white shadow-sm hover:bg-[#1A237E] transition-colors">Proceed to Checkout →</button>
+           <button onClick={openQuoteModal} className="px-5 py-2 bg-[#283593] rounded-lg text-sm font-bold text-white shadow-sm hover:bg-[#1A237E] transition-colors">Request Quote</button>
         </div>
       </header>
+
+      {showQuoteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl border border-gray-200 shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white">
+              <h2 className="text-lg font-black text-gray-900 tracking-tight">
+                {quoteSubmitted ? "Quote Submitted" : "Request a Quote"}
+              </h2>
+              <button
+                type="button"
+                onClick={closeQuoteModal}
+                className="w-8 h-8 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {quoteSubmitted ? (
+              <div className="p-8 text-center">
+                <div className="w-14 h-14 rounded-full bg-[#283593]/10 text-[#283593] flex items-center justify-center mx-auto mb-4 text-2xl font-black">
+                  ✓
+                </div>
+                <p className="text-base font-bold text-gray-900 leading-relaxed max-w-md mx-auto">
+                  Your quote request has been sent! We&apos;ll contact you within 24 hours with your custom quote.
+                </p>
+                <button
+                  type="button"
+                  onClick={closeQuoteModal}
+                  className="mt-6 px-5 py-2.5 bg-[#283593] rounded-lg text-sm font-bold text-white hover:bg-[#1A237E] transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitQuoteRequest} className="p-6 flex flex-col gap-6">
+                <section className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-4">Quote Summary</h3>
+                  <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                    <div><span className="font-bold text-gray-500">Box Type:</span> <span className="font-bold text-gray-900">{activeBox.name}</span></div>
+                    <div><span className="font-bold text-gray-500">Style:</span> <span className="font-bold text-gray-900">{activeBox.style.replace("-", " ")}</span></div>
+                    <div><span className="font-bold text-gray-500">Dimensions:</span> <span className="font-bold text-gray-900">{length}&quot; x {width}&quot; x {height}&quot;</span></div>
+                    <div><span className="font-bold text-gray-500">Quantity:</span> <span className="font-bold text-gray-900">{priceData.displayQty.toLocaleString()}</span></div>
+                    <div className="sm:col-span-2"><span className="font-bold text-gray-500">Material:</span> <span className="font-bold text-gray-900">{material}{materialCategory === "Cardboard" ? ` (${thickness})` : ""}</span></div>
+                    <div className="sm:col-span-2"><span className="font-bold text-gray-500">Print:</span> <span className="font-bold text-gray-900">{inkCoverage}</span></div>
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-gray-200 p-5">
+                  <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-4">Price Breakdown</h3>
+                  <div className="space-y-2 text-sm">
+                    {[
+                      ["Material Cost", priceData.materialCost],
+                      ["Print Cost", priceData.printCost],
+                      ["Setup Fees", priceData.setupFees],
+                      ["Shipping Estimate", priceData.shippingEstimate],
+                    ].map(([label, amount]) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <span className="font-bold text-gray-600">{label}</span>
+                        <span className="font-bold text-gray-900">${formatPrice(amount as number)}</span>
+                      </div>
+                    ))}
+                    {priceData.profitAmount > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-600">Margin</span>
+                        <span className="font-bold text-gray-900">${formatPrice(priceData.profitAmount)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-gray-200">
+                      <span className="font-black text-gray-900">Total</span>
+                      <span className="font-black text-[#283593] text-lg">${formatPrice(priceData.total)}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="grid sm:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Customer Name *</span>
+                    <input required value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-[#283593]" />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Email *</span>
+                    <input required type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-[#283593]" />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Phone</span>
+                    <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-[#283593]" />
+                  </label>
+                  <label className="flex flex-col gap-2 sm:col-span-2">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Shipping Address</span>
+                    <textarea value={shippingAddress} onChange={(e) => setShippingAddress(e.target.value)} rows={2} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-[#283593] resize-none" />
+                  </label>
+                  <label className="flex flex-col gap-2 sm:col-span-2">
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Any Special Notes</span>
+                    <textarea value={specialNotes} onChange={(e) => setSpecialNotes(e.target.value)} rows={3} className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-[#283593] resize-none" />
+                  </label>
+                </section>
+
+                <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                  <button type="button" onClick={closeQuoteModal} className="px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50 transition-colors">
+                    Cancel
+                  </button>
+                  <button type="submit" className="px-5 py-2.5 bg-[#283593] rounded-lg text-sm font-bold text-white hover:bg-[#1A237E] transition-colors">
+                    Submit Quote Request
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       <main className="flex flex-1 overflow-hidden relative">
         <aside className="w-[340px] border-r border-gray-200 bg-white p-6 overflow-y-auto shrink-0 flex flex-col gap-8 shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-10 relative">
