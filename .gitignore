@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# live pricing data (managed via admin panel, not in git)
+/data/pricing.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

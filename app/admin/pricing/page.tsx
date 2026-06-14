@@ -53,6 +53,7 @@ export default function AdminPricingPage() {
   const [authError, setAuthError] = useState("");
   const [config, setConfig] = useState<PricingConfig>(DEFAULT_PRICING_CONFIG);
   const [savedMessage, setSavedMessage] = useState("");
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     if (sessionStorage.getItem(ADMIN_AUTH_STORAGE_KEY) === "true") {
@@ -74,16 +75,26 @@ export default function AdminPricingPage() {
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
-    await savePricingConfig(config);
-    setSavedMessage("Pricing saved.");
-    window.setTimeout(() => setSavedMessage(""), 2500);
+    setSaveError("");
+    try {
+      await savePricingConfig(config);
+      setSavedMessage("Pricing saved.");
+      window.setTimeout(() => setSavedMessage(""), 2500);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to save pricing.");
+    }
   };
 
   const handleReset = async () => {
     setConfig(DEFAULT_PRICING_CONFIG);
-    await savePricingConfig(DEFAULT_PRICING_CONFIG);
-    setSavedMessage("Reset to defaults.");
-    window.setTimeout(() => setSavedMessage(""), 2500);
+    setSaveError("");
+    try {
+      await savePricingConfig(DEFAULT_PRICING_CONFIG);
+      setSavedMessage("Reset to defaults.");
+      window.setTimeout(() => setSavedMessage(""), 2500);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Failed to reset pricing.");
+    }
   };
 
   if (!authenticated) {
@@ -288,6 +299,9 @@ export default function AdminPricingPage() {
             >
               Reset to Defaults
             </button>
+            {saveError && (
+              <span className="mr-auto text-sm font-bold text-red-600">{saveError}</span>
+            )}
             {savedMessage && (
               <span className="text-sm font-bold text-[#283593]">{savedMessage}</span>
             )}

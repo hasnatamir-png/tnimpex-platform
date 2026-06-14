@@ -15,26 +15,25 @@ export type PricingConfig = {
 };
 
 export const ADMIN_PASSWORD = "tnimpex-admin";
-export const PRICING_STORAGE_KEY = "tnimpex-pricing-config";
 export const ADMIN_AUTH_STORAGE_KEY = "tnimpex-admin-authenticated";
 
 export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   materialRates: {
-    "SBS Premium White": 0.00,
-    "Kraft Paperboard": 0.00,
-    "Recycled Board": 0.00,
-    "Corrugated E-Flute": 0.0,
+    "SBS Premium White": 0.000,
+    "Kraft Paperboard": 0.004,
+    "Recycled Board": 0.0035,
+    "Corrugated E-Flute": 0.012,
     "Corrugated B-Flute": 0.015,
     "Corrugated C-Flute": 0.018,
   },
   thicknessMultiplier: {
-    "14pt (250gsm)": 0,
+    "14pt (250gsm)": 0.0,
     "16pt (300gsm)": 1.0,
     "18pt (350gsm)": 1.2,
     "24pt (400gsm)": 1.5,
   },
   inkMultiplier: {
-    "No Print (Blank)": 0,
+    "No Print (Blank)": 0.0,
     "Printed (CMYK)": 1.4,
     "Premium (Foil/Spot UV)": 2.1,
   },
@@ -52,7 +51,7 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
     international: 350,
   },
   profitMargin: 0,
-  surfaceAreaWasteFactor: 0.0,
+  surfaceAreaWasteFactor: 1.0,
   minQuantity: 500,
   defaultMaterialRate: 0.000,
   defaultShippingZone: "domestic",
@@ -94,55 +93,36 @@ export function mergePricingConfig(parsed: Partial<PricingConfig>): PricingConfi
   };
 }
 
-function loadPricingConfigFromLocalStorage(): PricingConfig {
-  if (typeof window === "undefined") {
-    return DEFAULT_PRICING_CONFIG;
-  }
-
-  try {
-    const stored = window.localStorage.getItem(PRICING_STORAGE_KEY);
-    if (!stored) return DEFAULT_PRICING_CONFIG;
-
-    return mergePricingConfig(JSON.parse(stored) as Partial<PricingConfig>);
-  } catch {
-    return DEFAULT_PRICING_CONFIG;
-  }
-}
-
 export async function loadPricingConfig(): Promise<PricingConfig> {
   if (typeof window === "undefined") {
-    return DEFAULT_PRICING_CONFIG;
+    const { readPricingFromFile } = await import("./pricing.server");
+    return readPricingFromFile();
   }
 
   try {
     const response = await fetch("/api/pricing", { cache: "no-store" });
-    if (response.ok) {
-      const parsed = (await response.json()) as Partial<PricingConfig>;
-      const config = mergePricingConfig(parsed);
-      window.localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(config));
-      return config;
-    }
+    if (!response.ok) return DEFAULT_PRICING_CONFIG;
+    const parsed = (await response.json()) as Partial<PricingConfig>;
+    return mergePricingConfig(parsed);
   } catch {
-    // Fall back to localStorage below.
+    return DEFAULT_PRICING_CONFIG;
   }
-
-  return loadPricingConfigFromLocalStorage();
 }
 
 export async function savePricingConfig(config: PricingConfig): Promise<void> {
-  if (typeof window === "undefined") return;
+  const response = await fetch("/api/pricing", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
 
-  window.localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(config));
-  window.dispatchEvent(new Event("pricing-config-updated"));
+  if (!response.ok) {
+    const result = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(result.error || "Failed to save pricing config.");
+  }
 
-  try {
-    await fetch("/api/pricing", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(config),
-    });
-  } catch {
-    // localStorage save still succeeded.
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("pricing-config-updated"));
   }
 }
 
